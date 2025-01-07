@@ -1,0 +1,953 @@
+/*
+ * [The "BSD license"]
+ *  Copyright (c) 2024 Ksenia Kotelnikova
+ *  All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without
+ *  modification, are permitted provided that the following conditions
+ *  are met:
+ *
+ *  1. Redistributions of source code must retain the above copyright
+ *     notice, this list of conditions and the following disclaimer.
+ *  2. Redistributions in binary form must reproduce the above copyright
+ *     notice, this list of conditions and the following disclaimer in the
+ *     documentation and/or other materials provided with the distribution.
+ *  3. The name of the author may not be used to endorse or promote products
+ *     derived from this software without specific prior written permission.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ *  IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ *  OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ *  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+ *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ *  NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ *  THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+ ocamlTypeInitMap ::= [
+ 	"bool":"False",
+ 	"int":"0",
+ 	"float":"0.0",
+ 	"str":"",
+ 	default:"object and"
+ ]
+
+ParserFile(file, parser, namedActions, contextSuperClass) ::= <<
+<fileHeader(file.grammarFileName, file.ANTLRVersion)>
+(* encoding: utf-8 *)
+
+ open Antlr_runtime.Input_stream
+ open Antlr_runtime.Atn_deserialize
+ open Antlr_runtime.Parser
+ open Antlr_runtime.Token
+ open Antlr_runtime.Lexer
+ open Antlr_runtime.Lexer_atn_simulator
+
+<namedActions.header>
+
+<parser>
+>>
+
+ ListenerFile(file, header, namedActions) ::= <<
+ <fileHeader(file.grammarFileName, file.ANTLRVersion)>
+ open Antlr_runtime.Input_stream
+ open Antlr_runtime.Atn_deserialize
+ open Antlr_runtime.Parser
+ open Antlr_runtime.Token
+ open Antlr_runtime.Lexer
+ open Antlr_runtime.Lexer_atn_simulator
+
+ <header>
+
+  (* This module defines a complete listener for a parse tree produced by <file.parserName>. *)
+  module <file.grammarName>Listener = struct
+
+  (* Define type for the listener *)
+  type t = {
+    <file.listenerNames:{lname |
+    (* Called when entering a parse tree produced by <file.parserName>#<lname>. *)
+    enter_<lname; format="decap"> : <file.parserName>.<lname; format="cap">Context -> unit;
+
+    (* Called when exiting a parse tree produced by <file.parserName>#<lname>. *)
+    exit_<lname; format="decap"> : <file.parserName>.<lname; format="cap">Context -> unit;
+    }; separator="\n">
+  }
+
+  let default_listener = {
+    <file.listenerNames:{lname |
+    enter_<lname; format="decap"> = (fun _ -> ());
+    exit_<lname; format="decap"> = (fun _ -> ());
+    }; separator="\n">
+  }
+
+  end;;
+ >>
+
+ VisitorFile(file, header, namedActions) ::= <<
+ <fileHeader(file.grammarFileName, file.ANTLRVersion)>
+ open Antlr_runtime
+
+ (* This class defines a complete generic visitor for a parse tree produced by <file.parserName>. *)
+
+ module <file.grammarName>Visitor = struct
+
+   (* Define type for the visitor *)
+   type 'a t = {
+     <file.visitorNames:{lname |
+     (* Visit a parse tree produced by <file.parserName>#<lname>. *)
+     visit_<lname; format="decap"> : <file.parserName>.<lname; format="cap">Context -> 'a;
+     }; separator="\n">
+   }
+
+   (* Default implementation that visits children *)
+   let default_visitor = {
+     <file.visitorNames:{lname |
+     visit_<lname; format="decap"> = (fun ctx -> visit_children ctx);
+     }; separator="\n">
+   }
+
+   (* Function to visit children of a node *)
+   and visit_children ctx =
+     (* Generic implementation to iterate over children *)
+     List.fold_left (fun acc child -> child |> visit ctx) () (children ctx)
+
+ end;;
+ >>
+
+ fileHeader(grammarFileName, ANTLRVersion) ::= <<
+ (* Generated from <grammarFileName> by ANTLR <ANTLRVersion> *)
+ >>
+
+ Parser(parser, funcs, atn, sempredFuncs, superClass) ::= <<
+ <Parser_(ctor="parser_ctor", ...)>
+ >>
+
+ Parser_(parser, funcs, atn, sempredFuncs, ctor, superClass) ::= <<
+  <atn>
+
+  (* Define the parser module *)
+  class grammar_<parser.name> tokens input output = object (self)
+        (* Grammar file name *)
+        val grammarFileName = "<parser.grammarFileName>"
+        (* ATN deserialization *)
+        val atn : atn = deserialize_atn serializedATN
+        (* Literal and symbolic names *)
+        val literalNames = [|
+          <parser.literalNames:{t | <t>}; null="\"<INVALID>\"", separator="; ", wrap, anchor>
+        |]
+        val symbolicNames = [|
+          <parser.symbolicNames:{t | <t>}; null="\"<INVALID>\"", separator="; ", wrap, anchor>
+        |]
+        (* Rules *)
+        <if(parser.rules)>
+        <parser.rules:{r | val rule_<r.name> = <r.index>}; separator="\n", wrap, anchor>
+        <endif>
+        val ruleNames = [|
+          <parser.ruleNames:{r | "<r>"}; separator="; ", wrap, anchor>
+        |]
+        (* End of file token *)
+        val eof = token_eof
+        val mutable token_stream = tokens
+        val mutable output_stream = output
+        (* Tokens *)
+        <if(parser.tokens)>
+        <parser.tokens:{k | val token_<k> = <parser.tokens.(k)>}; separator="\n", wrap, anchor>
+        <endif>
+
+        (* Init *)
+         initializer
+           let input_stream = CharStream.create input in
+           let lexer_simulator = LexerATNSimulator.create atn in
+           lexer_simulator.input \<- input_stream;
+           self#print_version "4.13.2";
+
+         method private print_version version =
+             Printf.printf "ANTLR runtime version: %s\n" version
+
+        (* Named actions *)
+        <namedActions.members>
+
+        (* Functions *)
+        (* <funcs; separator="\n"> *)
+
+        (* Semantic predicate functions *)
+        <if(sempredFuncs)>
+        method sempred localctx ruleIndex predIndex =
+          let predicates = ref None in
+          if !predicates = None then
+            predicates := Some (
+              <parser.sempredFuncs.values:{f | (<f.ruleIndex>, <parser.name>_<f.name>_sempred)}; separator="; ", wrap, anchor>
+            );
+          match List.assoc_opt ruleIndex (Option.get !predicates) with
+          | Some pred -> pred localctx predIndex
+          | None -> failwith ("No predicate with index: " ^ string_of_int ruleIndex)
+
+        <sempredFuncs.values; separator="\n">
+        <endif>
+
+        (* Function to run the parser *)
+        method run_parser input_text =
+            let input_stream = CharStream.create input_text in
+            let lexer_simulator = LexerATNSimulator.create atn in
+            lexer_simulator.input \<- input_stream;
+            let tokens = tokenize serializedATN in
+            List.iter
+              (fun token ->
+                try num token
+                with ParseError msg -> Printf.eprintf "Parse error: %s\n" msg)
+              tokens
+  end;;
+
+
+ >>
+
+ dumpActions(recog, argFuncs, actionFuncs, sempredFuncs) ::= <<
+ <if(actionFuncs)>
+ let action self localctx ruleIndex actionIndex =
+   match self._actions with
+   | None ->
+       let actions = Hashtbl.create 10 in
+       <recog.actionFuncs.values:{f|
+           Hashtbl.add actions <f.ruleIndex> (self.<f.name>_action); |}; separator="\n">
+       self._actions \<- Some actions
+   | Some actions ->
+       let action = try Hashtbl.find actions ruleIndex with Not_found -> None in
+       match action with
+       | Some action -> action localctx actionIndex
+       | None -> failwith ("No registered action for: " ^ string_of_int ruleIndex)
+ <actionFuncs.values; separator="\n">
+ <endif>
+
+ <if(sempredFuncs)>
+ let sempred self localctx ruleIndex predIndex =
+   match self._predicates with
+   | None ->
+       let preds = Hashtbl.create 10 in
+       <recog.sempredFuncs.values:{f|
+           Hashtbl.add preds <f.ruleIndex> (self.<f.name>_sempred); |}; separator="\n">
+       self._predicates \<- Some preds
+   | Some preds ->
+       let pred = try Hashtbl.find preds ruleIndex with Not_found -> None in
+       match pred with
+       | Some pred -> pred localctx predIndex
+       | None -> failwith ("No registered predicate for: " ^ string_of_int ruleIndex)
+ <sempredFuncs.values; separator="\n">
+ <endif>
+ >>
+
+ parser_ctor(p) ::= <<
+ let parser_ctor p =
+   let input = p.input in
+   let output = match p.output with
+     | Some output -> output
+     | None -> stdout
+   in
+   super#init input output;
+   self#checkVersion "<file.ANTLRVersion>";
+   self._interp \<- new ParserATNSimulatorf.self self.atn self.decisionsToDFA self.sharedContextCache;
+   self._predicates \<- None;
+
+ >>
+
+ /* This generates a private method since the actionIndex is generated, making an
+  * overriding implementation impossible to maintain.
+  */
+ RuleActionFunction(r, actions) ::= <<
+
+let <r.name>_action self localctx actionIndex =
+  match actionIndex with
+  | <actions:{index|
+      | <if(first(actions))>
+          <index> -> <actions.(index)>
+      <elseif(rest(actions))>
+          | <index> -> <actions.(index)>
+      <endif> }; separator="\n">
+  | _ -> ()
+
+ >>
+
+ /* This generates a private method since the predIndex is generated, making an
+  * overriding implementation impossible to maintain.
+  */
+ RuleSempredFunction(r, actions) ::= <<
+let <r.name>_sempred self localctx predIndex =
+  match predIndex with
+  | <actions:{index|
+      | <if(first(actions))>
+          <index> -> <actions.(index)>
+      <elseif(rest(actions))>
+          | <index> -> <actions.(index)>
+      <endif> }; separator="\n">
+  | _ -> true
+
+ >>
+
+ RuleFunction(currentRule,args,code,locals,ruleCtx,altLabelCtxs,namedActions,finallyAction,postamble,exceptions) ::= <<
+
+ <ruleCtx>
+
+ <altLabelCtxs:{l | <altLabelCtxs.(l)>}; separator="\n">
+
+ method <currentRule.escapedName> self <currentRule.args:{a | , <a.escapedName><if(a.type)> : <a.type><endif>}> =
+   let localctx = new <parser.name>.<currentRule.ctxType>.self self._ctx self.state <currentRule.args:{a | , <a.escapedName>}> in
+   self#enterRule localctx <currentRule.startState> self.RULE_<currentRule.name>;
+   <namedActions.init>
+   <locals; separator="\n">
+   begin
+   try
+     <code>
+     <postamble; separator="\n">
+     <namedActions.after>
+   <if(exceptions)>
+     <exceptions; separator="\n">
+   <else>
+     with RecognitionException re ->
+         localctx#exception \<- Some re;
+         self#_errHandler#reportError self re;
+         self#_errHandler#recover self re;
+   <endif>
+ >>
+
+LeftRecursiveRuleFunction(currentRule, args, code, locals, ruleCtx, altLabelCtxs,
+    namedActions, finallyAction, postamble) ::=
+<<
+
+<ruleCtx>
+<altLabelCtxs:{l | <altLabelCtxs.(l)>}; separator="\n">
+
+let <currentRule.escapedName> self ?(_p=0) <if(currentRule.args)><args:{a | <a>}><endif> =
+  let _parentctx = self._ctx in
+  let _parentState = self.state in
+  let localctx = <parser.name>.<currentRule.ctxType> self self._ctx _parentState<args:{a | , <a.escapedName>}> in
+  let _prevctx = ref localctx in
+  let _startState = <currentRule.startState> in
+  self#enterRecursionRule localctx <currentRule.startState> self#RULE_<currentRule.name> _p;
+  <namedActions.init>
+  <locals; separator="\n">
+  try
+    <code>
+    <postamble; separator="\n">
+    <namedActions.after>
+  with RecognitionException as re ->
+    localctx#exception_ \<- Some re;
+    self#_errHandler#reportError self re;
+    self#_errHandler#recover self re
+  finally
+    <finallyAction>
+    self#unrollRecursionContexts _parentctx;
+  localctx
+>>
+
+ CodeBlockForOuterMostAlt(currentOuterMostAltCodeBlock, locals, preamble, ops) ::= <<
+ <if(currentOuterMostAltCodeBlock.altLabel)>
+  let localctx = new <parser.name>.<currentOuterMostAltCodeBlock.altLabel; format="cap">Context self localctx in
+ <endif>
+  self#enterOuterAlt localctx <currentOuterMostAltCodeBlock.alt.altNum>;
+ <CodeBlockForAlt(currentAltCodeBlock=currentOuterMostAltCodeBlock, ...)>
+
+ >>
+
+ CodeBlockForAlt(currentAltCodeBlock, locals, preamble, ops) ::= <<
+ <locals; separator="\n">
+ <preamble; separator="\n">
+ <ops; separator="\n">
+
+ >>
+
+ LL1AltBlock(choice, preamble, alts, error) ::= <<
+ self.state \<- <choice.stateNumber>;
+ self#_errHandler#sync self;
+ <if(choice.label)>
+   let <labelref(choice.label)> = self#_input#LT 1 in
+ <endif>
+ <preamble; separator="\n">
+ let token = self#_input#LA 1 in
+ <choice.altLook, alts:{look, alt |
+     <cases(tokens=look)>
+     <alt>
+     pass}; separator="\nel">
+ else
+   <error>
+
+ >>
+
+ LL1OptionalBlock(choice, alts, error) ::= <<
+ self.state \<- <choice.stateNumber>;
+ self#_errHandler#sync self;
+ let token = self#_input#LA 1 in
+ <choice.altLook, alts:{look, alt |
+     <cases(tokens=look)>
+     <alt>
+     pass}; separator="\nel">
+ else
+   ()
+ >>
+
+ LL1OptionalBlockSingleAlt(choice, expr, alts, preamble, error, followExpr) ::= <<
+ self.state \<- <choice.stateNumber>;
+ self#_errHandler#sync self;
+ <preamble; separator="\n">
+ if <expr> then
+   <alts; separator="\n">
+ else if not <followExpr> then
+   <error>
+
+ >>
+
+ LL1StarBlockSingleAlt(choice, loopExpr, alts, preamble, iteration) ::= <<
+ self.state \<- <choice.stateNumber>;
+ self#_errHandler#sync self;
+ <preamble; separator="\n">
+ while <loopExpr> do
+   <alts; separator="\n">
+   self.state \<- <choice.loopBackStateNumber>;
+   self#_errHandler#sync self;
+   <iteration>
+ done
+
+ >>
+
+ LL1PlusBlockSingleAlt(choice, loopExpr, alts, preamble, iteration) ::= <<
+ self.state \<- <choice.blockStartStateNumber>;
+ self#_errHandler#sync self;
+ <preamble; separator="\n">
+ while true do
+   <alts; separator="\n">
+   self.state \<- <choice.stateNumber>;
+   self#_errHandler#sync self;
+   <iteration>;
+   if not <loopExpr> then
+     break
+ done
+
+ >>
+
+ AltBlock(choice, preamble, alts, error) ::= <<
+ self.state \<- <choice.stateNumber>;
+ self#_errHandler#sync self;
+ <if(choice.label)>
+   let <labelref(choice.label)> = self#_input#LT 1 in
+ <endif>
+ <preamble; separator="\n">
+ let la_ = self#_interp#adaptivePredict self#_input <choice.decision> self#_ctx in
+ <alts:{alt |
+   if la_ = <i> then
+     <alt>;
+ }>; separator="\n">
+
+ >>
+
+ OptionalBlock(choice, alts, error) ::= <<
+ self.state \<- <choice.stateNumber>;
+ self#_errHandler#sync self;
+ let la_ = self#_interp#adaptivePredict self#_input <choice.decision> self#_ctx in
+ <alts:{alt |
+   if la_ = <i><if(!choice.ast.greedy)> + 1<endif> then
+     <alt>;
+ }>; separator="\n">
+
+ >>
+
+ StarBlock(choice, alts, sync, iteration) ::= <<
+   self.state \<- <choice.stateNumber>;
+   self#_errHandler#sync self;
+   let rec loop () =
+     let _alt = self#_interp#adaptivePredict self#_input <choice.decision> self#_ctx in
+     if _alt \<\> <choice.exitAlt> && _alt \<\> ATN.INVALID_ALT_NUMBER then
+       (if _alt = 1<if(!choice.ast.greedy)> + 1<endif> then
+          <iteration>;
+          <alts> (* should only be one *)
+        );
+       self.state \<- <choice.loopBackStateNumber>;
+       self#_errHandler#sync self;
+       loop ()
+   in
+   loop ()
+ >>
+
+PlusBlock(choice, alts, error) ::= <<
+  self.state \<- <choice.blockStartStateNumber>; (* alt block decision *)
+  self#_errHandler#sync self;
+  let rec loop _alt =
+    if _alt <> <choice.exitAlt> && _alt <> ATN.INVALID_ALT_NUMBER then
+      (match _alt with
+      <alts:{alt|
+      | <i><if(!choice.ast.greedy)> + 1<endif> ->
+          <alt>
+      }; separator="\n">
+      | _ ->
+          <error>
+      );
+      self.state <- <choice.loopBackStateNumber>; (* loopback/exit decision *)
+      self#_errHandler#sync self;
+      let new_alt = self#_interp#adaptivePredict self#_input <choice.decision> self#_ctx in
+      loop new_alt
+  in
+  loop 1<if(!choice.ast.greedy)> + 1<endif>
+>>
+
+
+ Sync(s) ::= "sync(<s.expecting.name>)"
+
+ ThrowNoViableAlt(t) ::= "let throw_no_viable_alt () = raise (NoViableAltException self)"
+
+ TestSetInline(s) ::= <<
+ let test_set_inline s =
+   let rec compare_bits bits =
+     match bits with
+     | [] -> ""
+     | [bit] -> bitset_inline_comparison s bit
+     | bit :: rest ->
+         (bitset_bitfield_comparison s bit) ^ " or " ^ compare_bits rest
+   in
+   compare_bits s.bitsets
+ >>
+
+ // Java language spec 15.19 - shift operators mask operands rather than overflow to 0... need range test
+ testShiftInRange(shiftAmount) ::= <<
+ let test_shift_in_range shift_amount =
+   (shift_amount land lnot 0x3f) = 0
+ >>
+
+ bitsetBitfieldComparison(s, bits) ::= <%
+ let bitset_bitfield_comparison s bits =
+   (test_shift_in_range (offset_shift_var s.varName bits.shift))
+   && (((1 lsl (offset_shift_var s.varName bits.shift)) land bits.calculated) != 0)
+ %>
+
+ isZero ::= <<
+ let is_zero value =
+   match value with
+   | "0" -> true
+   | _ -> false
+ >>
+
+ offsetShiftVar(shiftAmount, offset) ::= <%
+ let offset_shift_var shift_amount offset =
+   if not (is_zero offset) then
+     shift_amount - offset
+   else
+     shift_amount
+ %>
+
+ offsetShiftType(shiftAmount, offset) ::= <%
+ let offset_shift_type shift_amount <offset> =
+   if not (is_zero offset) then
+     (<parser.name>.<shift_amount>) - <offset>
+   else
+     <parser.name>.<shift_amount>
+
+ %>
+
+ bitsetInlineComparison(s, bits) ::= <%
+ <
+ let bitset_inline_comparison s bits =
+   let compare_tokens tokens =
+     String.concat " or " (List.map (fun t -> Printf.sprintf "%s == %s" s.varName t.type) bits.tokens)
+   in
+   compare_tokens bits.tokens>
+
+ %>
+
+ cases(tokens) ::= <<
+ let cases <tokens> token =
+   if List.exists (fun t -> List.mem t.type (List.map (fun x -> x.type) <tokens>)) [token] then
+
+ >>
+
+InvokeRule(r, argExprsChunks) ::= <<
+  self.state \<- <r.stateNumber>;
+  <if(r.labels)>
+  <r.labels:{l | <labelref(l)> \<- }><endif>
+  self#<r.escapedName> <if(r.ast.options.p)><r.ast.options.p><if(argExprsChunks)>,<endif><endif><argExprsChunks>
+>>
+
+MatchToken(m) ::= <<
+  self.state \<- <m.stateNumber>;
+  <if(m.labels)>
+  <m.labels:{l | <labelref(l)> \<- }><endif>
+  self#match <parser.name>.<m.name>
+>>
+
+MatchSet(m, expr, capture) ::= "CommonSetStuff <m> <expr> <capture> <false>"
+
+ MatchNotSet(m, expr, capture) ::= "CommonSetStuff <m> <expr> <capture> <true>"
+
+ CommonSetStuff(m, expr, capture, invert) ::= <<
+ let common_set_stuff m expr capture invert =
+   self.state \<- <m.stateNumber>;
+   <if(m.labels)><List.iter (fun l -> let _ = <labelref(l)> in ()) m.labels;><endif>
+   <capture>;
+   if invert then
+     if <m.varName> <= 0 || <expr> then
+       ()
+     else
+       if not <expr> then
+         ()
+       else
+         self._errHandler.reportMatch self;
+         self#consume ()
+   else
+     if not <expr> then
+       ()
+     else
+       self._errHandler.reportMatch self;
+       self#consume ()
+
+ >>
+
+ Wildcard(w) ::= <<
+ let wildcard w =
+   self.state \<- <w.stateNumber>;
+   <if(w.labels)><List.iter (fun l -> let _ = <labelref(l)> in ()) w.labels;><endif>
+   self#matchWildcard ()
+ >>
+
+ Action(a, foo, chunks) ::= "let action a foo chunks = <chunks>"
+
+ ArgAction(a, chunks) ::= "let arg_action a chunks = <chunks>"
+
+ SemPred(p, chunks, failChunks) ::= <<
+ let sempred p chunks failChunks =
+   self.state \<- <p.stateNumber>;
+   if not <chunks> then
+     let open Antlr4.Error in
+     raise (FailedPredicateException (self, <p.predicate> <if(failChunks)> , <failChunks> <elseif(p.msg)> , <p.msg> <endif>))
+ >>
+
+ ExceptionClause(e, catchArg, catchAction) ::= <<
+ let exception_clause e catchArg catchAction =
+   try
+     (* some code that might raise an exception *)
+   with
+   | <catchArg> -> <catchAction>
+ >>
+
+ // lexer actions are not associated with model objects
+
+ LexerSkipCommand()  ::= "skip()"
+ LexerMoreCommand()  ::= "more()"
+ LexerPopModeCommand() ::= "popMode()"
+
+ LexerTypeCommand(arg, grammar)      ::= "_type \<- <arg>"
+ LexerChannelCommand(arg, grammar)   ::= "_channel \<- <arg>"
+ LexerModeCommand(arg, grammar)      ::= "_mode \<- <arg>"
+ LexerPushModeCommand(arg, grammar)  ::= "pushMode <arg>"
+
+ ActionText(t) ::= "<t.text>"
+ ActionTemplate(t) ::= "<t.st>"
+ ArgRef(a) ::= "localctx.<a.escapedName>"
+ LocalRef(a) ::= "localctx.<a.escapedName>"
+ RetValueRef(a) ::= "localctx.<a.escapedName>"
+ QRetValueRef(a) ::= "<ctx(a)>.<a.dict>.<a.escapedName>"
+ /** How to translate $tokenLabel */
+ TokenRef(t) ::= "<ctx(t)>.<t.escapedName>"
+ LabelRef(t) ::= "<ctx(t)>.<t.escapedName>"
+ ListLabelRef(t) ::= "<ctx(t)>.<ListLabelName(t.escapedName)>"
+ SetAttr(s,rhsChunks) ::= "<ctx(s)>.<s.escapedName> = <rhsChunks>"
+
+ TokenLabelType() ::= "<file.TokenLabelType; null={Token}>"
+ InputSymbolType() ::= "<file.InputSymbolType; null={Token}>"
+
+ TokenPropertyRef_text(t) ::= "(if <ctx(t)>.<t.label> is None then None else <ctx(t)>.<t.label>.text)"
+ TokenPropertyRef_type(t) ::= "(if <ctx(t)>.<t.label> is None then 0 else <ctx(t)>.<t.label>.type)"
+ TokenPropertyRef_line(t) ::= "(if <ctx(t)>.<t.label> is None then 0 else <ctx(t)>.<t.label>.line)"
+ TokenPropertyRef_pos(t) ::= "(if <ctx(t)>.<t.label> is None then 0 else <ctx(t)>.<t.label>.column)"
+ TokenPropertyRef_channel(t) ::= "(if <ctx(t)>.<t.label> is None then 0 else <ctx(t)>.<t.label>.channel)"
+ TokenPropertyRef_index(t) ::= "(if <ctx(t)>.<t.label> is None then 0 else <ctx(t)>.<t.label>.tokenIndex)"
+ TokenPropertyRef_int(t) ::= "(if <ctx(t)>.<t.label> is None then 0 else int(<ctx(t)>.<t.label>.text))"
+
+ RulePropertyRef_start(r) ::= "(if <ctx(r)>.<r.label> is None then None else <ctx(r)>.<r.label>.start)"
+ RulePropertyRef_stop(r)	 ::= "(if <ctx(r)>.<r.label> is None then None else <ctx(r)>.<r.label>.stop)"
+ RulePropertyRef_text(r)	 ::= "(if <ctx(r)>.<r.label> is None then None else self._input.getText(<ctx(r)>.<r.label>.start,<ctx(r)>.<r.label>.stop))"
+ RulePropertyRef_ctx(r)	 ::= "<ctx(r)>.<r.label>"
+ RulePropertyRef_parser(r)	 ::= "self"
+
+ ThisRulePropertyRef_start(r) ::= "localctx.start"
+ ThisRulePropertyRef_stop(r)	 ::= "localctx.stop"
+ ThisRulePropertyRef_text(r)	 ::= "self._input#getText(localctx.start, self._input.LT(-1))"
+ ThisRulePropertyRef_ctx(r)	 ::= "localctx"
+ ThisRulePropertyRef_parser(r)	 ::= "self"
+
+ NonLocalAttrRef(s)		 	 ::= "self.getInvokingContext(<s.ruleIndex>).<s.escapedName>"
+ SetNonLocalAttr(s, rhsChunks)  ::= "self.getInvokingContext(<s.ruleIndex>).<s.escapedName> = <rhsChunks>"
+
+ AddToLabelList(a) ::= "<ctx(a.label)>.<a.listName>.append(<labelref(a.label)>)"
+
+ TokenDecl(t) ::= "self.<t.escapedName> \<- None (* <TokenLabelType()> *)"
+ TokenTypeDecl(t) ::= "self.<t.escapedName> \<- 0 (* <TokenLabelType()> type *)"
+ TokenListDecl(t) ::= "self.<t.escapedName> \<- list() (* of <TokenLabelType()>s *)"
+ RuleContextDecl(r) ::= "self.<r.escapedName> \<- None (* <r.ctxName> *)"
+ RuleContextListDecl(rdecl) ::= "self.<rdecl.escapedName> \<- list() (* of <rdecl.ctxName>s *)"
+
+ ContextTokenGetterDecl(t)      ::= <<
+ let <t.escapedName> self =
+   self#getToken (<parser.name>.<t.name>) 0
+
+ >>
+
+ // should never be called
+ ContextTokenListGetterDecl(t)  ::= <<
+ let <t.name>_list self =
+   self#getTokens (<parser.name>.<t.name>)
+
+ >>
+
+ ContextTokenListIndexedGetterDecl(t)  ::= <<
+ let <t.escapedName> self ?i =
+   match i with
+   | None -> self#getTokens (<parser.name>.<t.name>)
+   | Some i' -> self#getToken (<parser.name>.<t.name>) i'
+
+ >>
+
+ ContextRuleGetterDecl(r)       ::= <<
+ let <r.escapedName> self =
+   self#getTypedRuleContext (<parser.name>.<r.ctxName>) 0
+
+ >>
+
+ // should never be called
+ ContextRuleListGetterDecl(r)   ::= <<
+ let <r.name>_list self =
+   self#getTypedRuleContexts (<parser.name>.<r.ctxName>)
+
+ >>
+
+ ContextRuleListIndexedGetterDecl(r)   ::= <<
+ let <r.escapedName> self ?i =
+   match i with
+   | None -> self#getTypedRuleContexts (<parser.name>.<r.ctxName>)
+   | Some i' -> self#getTypedRuleContext (<parser.name>.<r.ctxName>) i'
+
+ >>
+
+ LexerRuleContext() ::= "RuleContext"
+
+ /** The rule context name is the rule followed by a suffix; e.g.,
+  *  r becomes rContext.
+  */
+ RuleContextNameSuffix() ::= "Context"
+
+ ImplicitTokenLabel(tokenName) ::= "_<tokenName>"
+ ImplicitRuleLabel(ruleName)	  ::= "_<ruleName>"
+ ImplicitSetLabel(id)		  ::= "_tset<id>"
+ ListLabelName(label)		  ::= "<label>"
+
+ CaptureNextToken(d) ::= "<d.varName> = self#_input.LT 1"
+ CaptureNextTokenType(d) ::= "<d.varName> = self#_input.LA 1"
+
+StructDecl(struct, ctorAttrs, attrs, getters, dispatchMethods, interfaces, extensionMembers, signatures) ::= <<
+
+
+  <dispatchMethods; separator="\n">
+  <extensionMembers; separator="\n">
+>>
+
+ AltLabelStructDecl(struct,attrs,getters,dispatchMethods) ::= <<
+ class <struct.escapedName> (<currentRule.name; format="cap">Context) =
+   inherit <currentRule.name; format="cap">Context
+
+   val mutable <attrs:{a | <a>}>
+
+   method __init__ (parser : <parser.name>) (ctx : ParserRuleContext) =
+     super#<currentRule.name; format="cap">Context parser ctx
+     <attrs:{a | self#<a.escapedName> \<- <a.escapedName>}; separator="\n">
+     self#copyFrom ctx
+
+   <getters:{g | <g>}; separator="\n">
+
+   <dispatchMethods; separator="\n">
+
+ >>
+
+ ListenerDispatchMethod(method) ::= <<
+ >>
+
+ VisitorDispatchMethod(method) ::= <<
+ method accept (visitor : ParseTreeVisitor) =
+   if Hashtbl.mem visitor "visit<struct.derivedFromName; format="cap">" then
+     visitor#visit<struct.derivedFromName; format="cap"> self
+   else
+     visitor#visitChildren self
+
+ >>
+
+ AttributeDecl(d) ::= "self.<d.escapedName> = <if(d.initValue)><d.initValue><else>None<endif>"
+
+ /** If we don't know location of label def x, use this template */
+ labelref(x) ::= "<if(!x.isLocal)>localctx.<endif><x.escapedName>"
+
+ /** For any action chunk, what is correctly-typed context struct ptr? */
+ ctx(actionChunk) ::= "localctx"
+
+ // used for left-recursive rules
+ recRuleAltPredicate(ruleName,opPrec)  ::= "self#precPred self#_ctx <opPrec>"
+ recRuleSetReturnAction(src,name)	  ::= "let <name> = <src>.<name>"
+ recRuleSetStopToken()                 ::= "self#_ctx#stop \<- self#_input#LT (-1)"
+
+ recRuleAltStartAction(ruleName, ctxName, label, isListLabel) ::= <<
+ let localctx = <parser.name>.<ctxName>Context self#_parentctx self#_parentState
+ <if(label)>
+ <if(isListLabel)>
+   localctx#<label> \<- (_prevctx :: localctx#<label>)
+ <else>
+   localctx#<label> \<- _prevctx
+ <endif>
+ <endif>
+ self#pushNewRecursionContext localctx _startState self#RULE_<ruleName>
+
+ >>
+
+ recRuleLabeledAltStartAction(ruleName, currentAltLabel, label, isListLabel) ::= <<
+ let localctx = <parser.name>.<currentAltLabel; format="cap">Context self#<parser.name>.<ruleName; format="cap">Context self#_parentctx self#_parentState
+ <if(label)>
+   <if(isListLabel)>
+     localctx#<label> \<- (_prevctx :: localctx#<label>)
+   <else>
+     localctx#<label> \<- _prevctx
+   <endif>
+ <endif>
+ self#pushNewRecursionContext localctx _startState self#RULE_<ruleName>
+
+ >>
+
+ recRuleReplaceContext(ctxName) ::= <<
+ let localctx = <parser.name>.<ctxName>Context self#localctx
+ self#_ctx \<- localctx
+ _prevctx \<- localctx
+
+ >>
+
+ recRuleSetPrevCtx() ::= <<
+ if self#_parseListeners <> None then
+   self#triggerExitRuleEvent ()
+ _prevctx <- localctx
+
+ >>
+
+
+ LexerFile(lexerFile, lexer, namedActions) ::= <<
+ <fileHeader(lexerFile.grammarFileName, lexerFile.ANTLRVersion)>
+ open Antlr_runtime.Input_stream
+ open Antlr_runtime.Atn_deserialize
+ open Antlr_runtime.Parser
+ open Antlr_runtime.Token
+ open Antlr_runtime.Lexer
+ open Antlr_runtime.Lexer_atn_simulator
+
+ <namedActions.header>
+
+ <lexer>
+ >>
+
+ Lexer(lexer, atn, actionFuncs, sempredFuncs, superClass) ::= <<
+ (* File generated by ANTLR, do not edit manually *)
+ (* encoding: utf-8 *)
+
+ class grammar_<lexer.name> input = object (self)
+   (* ATN deserialization *)
+   val atn = deserialize_atn serializedATN
+   (* Channel names *)
+   val channelNames = [|
+     "DEFAULT_TOKEN_CHANNEL"; "HIDDEN";
+     <lexer.channelNames:{c| "<c>"}; separator="; ", wrap, anchor>
+   |]
+   (* Mode names *)
+   val modeNames = [|
+     <lexer.modes:{m| "<m>"}; separator="; ", wrap, anchor>
+   |]
+   (* Literal names *)
+   val literalNames = [|
+     "<INVALID>";
+     <lexer.literalNames:{t | "<t>"}; separator="; ", wrap, anchor>
+   |]
+   (* Symbolic names *)
+   val symbolicNames = [|
+     "<INVALID>";
+     <lexer.symbolicNames:{t | <t>}; separator="; ", wrap, anchor>
+   |]
+   (* Rule names *)
+   val ruleNames = [|
+     <lexer.ruleNames:{r | "<r>"}; separator="; ", wrap, anchor>
+   |]
+   (* Grammar file name *)
+   val grammarFileName = "<lexer.grammarFileName>"
+   (* Lexer constructor *)
+   val mutable lexer_simulator = Obj.magic ()
+   (* Input stream *)
+     val input_stream = CharStream.create input
+
+   (* Init *)
+   initializer
+       lexer_simulator \<- LexerATNSimulator.create atn;
+       lexer_simulator.input \<- input_stream
+
+   method tokenize_numbers =
+         let is_digit c = c >= '0' && c \<= '9' in
+         let rec aux start idx acc =
+           if idx >= String.length input then
+             List.rev acc
+           else
+             let rec find_number idx =
+               if idx \< String.length input && is_digit (String.get input idx) then
+                 find_number (idx + 1)
+               else
+                 idx
+             in
+             if idx \< String.length input && is_digit (String.get input idx) then
+               let end_idx = find_number idx in
+               let number = String.sub input idx (end_idx - idx) in
+               let token = {
+                 token_type = 1;
+                 text = number;
+                 start = idx;
+                 stop = end_idx - 1;
+               } in
+               aux (end_idx + 1) (end_idx + 1) (token :: acc)
+             else
+               aux (start + 1) (start + 1) acc
+         in
+         aux 0 0 []
+
+         method print_tokens =
+           let tokens = self#tokenize_numbers in
+           List.iter
+             (fun token ->
+               Printf.printf "Token type: %d, Text: %s, Start: %d, Stop: %d\n"
+                 token.token_type token.text token.start token.stop)
+             tokens
+
+   (* Named actions *)
+   <namedActions.members>
+
+   (* Actions and predicates handling *)
+   <dumpActions(lexer, "", actionFuncs, sempredFuncs)>
+
+ end;;
+ >>
+
+
+ SerializedATN(model) ::= <<
+ let serializedATN =
+   [|
+     <model.serialized: {s | <s>}; separator=";" , wrap>
+   |]
+ >>
+
+ /** Using a type to init value map, try to init a type; if not in table
+  *  must be an object, default value is "null".
+  */
+ initValue(typeName) ::= <<
+ match typeName with
+ | "int" -> 0
+ | "string" -> ""
+ | "bool" -> false
+ | "float" -> 0.0
+ | _ -> failwith ("Unknown type: " ^ typeName)
+ >>
+
+ codeFileExtension() ::= ".ml"
