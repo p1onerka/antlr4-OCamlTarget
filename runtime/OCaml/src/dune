@@ -1,0 +1,11 @@
+(library
+ (name runtime)
+ (public_name runtime)
+ (modules
+  Utils
+  Token
+  Parser
+  Atn_deserialize
+  Input_stream
+  Lexer
+  Lexer_atn_simulator))
