@@ -5,14 +5,14 @@
 (generate_opam_files true)
 
 (source
- (github p1onerka/ANTLR-OCamlTarget))
+ (github p1onerka/antlr4-OCamlTarget))
 
 (authors "Ksenia Kotelnikova")
 
 (maintainers "Ksenia Kotelnikova")
 
 (package
- (name projtest)
+ (name runtime)
  (synopsis "runtime module for ANTLR")
  (description "OCaml runtime module for ANTLR")
  (depends ocaml dune (ocamlformat :build))

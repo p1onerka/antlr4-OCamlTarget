@@ -1,0 +1,17 @@
+# dune build
+# OCAMLPARAM: unset
+# Shared cache: disabled
+# Shared cache location: /Users/kseniakotelnikova/.cache/dune/db
+# Workspace root: /Users/kseniakotelnikova/antlr4-OCamlTarget/runtime/OCaml
+# Auto-detected concurrency: 8
+# Dune context:
+#  { name = "default"
+#  ; kind = "default"
+#  ; profile = Dev
+#  ; merlin = true
+#  ; fdo_target_exe = None
+#  ; build_dir = In_build_dir "default"
+#  ; instrument_with = []
+#  }
+$ /Users/kseniakotelnikova/.opam/zanuda/bin/ocamlc.opt -config > /var/folders/s4/_43lms7501b6rsnl_3j2252c0000gn/T/dune_1b3b2b_output
+# Promoting "_build/default/runtime.opam" to "runtime.opam"
