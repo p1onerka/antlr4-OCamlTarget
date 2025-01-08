@@ -46,7 +46,13 @@
 			<artifactId>icu4j</artifactId>
 			<version>72.1</version>
 		</dependency>
-	</dependencies>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.13.2</version>
+            <scope>compile</scope>
+        </dependency>
+    </dependencies>
 	<build>
 		<sourceDirectory>src</sourceDirectory>
 		<testResources>
