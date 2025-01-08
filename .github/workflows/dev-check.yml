@@ -5,44 +5,40 @@ on:
     branches:
       - dev
 
+env:
+  OPAMROOT: /home/user/.opam
+  OPAMCONFIRMLEVEL: unsafe-yes
+
 jobs:
-  lint-and-format:
+  format-and-lint:
     runs-on: ubuntu-latest
+    container:
+      image: kakadu18/ocaml:fp2024
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Set up OCaml
-        uses: avsm/setup-ocaml@v2
+        uses: actions/checkout@v4
         with:
-          ocaml-version: '4.14.0'
+          fetch-depth: 0
 
-      - name: Install dependencies
+      - name: Installing dependencies
         run: |
+          sudo apt-get update
           opam update
-          opam install dune ocamlformat zanuda
+          opam install ocamlformat --deps-only --yes
+          opam install zanuda --yes
 
-      - name: Checking ocamlformat
+      - name: Format code with ocamlformat
         run: |
-          cd ${{ github.workspace }}
-          opam exec -- dune build @fmt --profile=release
+          opam exec -- ocamlformat --version
+          opam exec -- ocamlformat --inplace $(find . -name "*.ml" -or -name "*.mli")
 
-      - name: Pin zanuda to the latest version
+      - name: Run zanuda linter
         run: |
-          opam pin add https://github.com/Kakadu/zanuda.git --no-action
-          opam reinstall zanuda --yes
+          opam exec -- zanuda -dir . -add-prefix src/ > zanuda_report.txt
 
-      - name: Setting the environment
-        env:
-          LINTS_PATH: _build/default/_found_lints
-        run: |
-          echo "RDJSON_DIR_PATH=${{ env.LINTS_PATH }}" >> $GITHUB_ENV
-          echo "RDJSON_FILE_PATH=${{ env.LINTS_PATH }}/lints.rdjsonl" >> $GITHUB_ENV
-          mkdir -p ${{ env.LINTS_PATH }}
-          echo "ZANUDA_REPORT_FILE_PATH=${{ env.LINTS_PATH }}/lints.txt" >> $GITHUB_ENV
-
-      - name: Running linter in ${{ github.workspace }}...
-        run: |
-          cd ${{ github.workspace }}
-          opam exec -- zanuda -dir . -add-prefix ${{ github.workspace }}/ -no-no_toplevel_eval -ordjsonl ${{ env.RDJSON_FILE_PATH }} > ${{ env.ZANUDA_REPORT_FILE_PATH }}
+      - name: Upload linter artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zanuda_report
+          path: zanuda_report.txt
