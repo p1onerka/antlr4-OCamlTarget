@@ -1,0 +1,48 @@
+name: Lint and Format OCaml Code
+
+on:
+  push:
+    branches:
+      - dev
+
+jobs:
+  lint-and-format:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up OCaml
+        uses: avsm/setup-ocaml@v2
+        with:
+          ocaml-version: '4.14.0'
+
+      - name: Install dependencies
+        run: |
+          opam update
+          opam install dune ocamlformat zanuda
+
+      - name: Checking ocamlformat
+        run: |
+          cd ${{ github.workspace }}
+          opam exec -- dune build @fmt --profile=release
+
+      - name: Pin zanuda to the latest version
+        run: |
+          opam pin add https://github.com/Kakadu/zanuda.git --no-action
+          opam reinstall zanuda --yes
+
+      - name: Setting the environment
+        env:
+          LINTS_PATH: _build/default/_found_lints
+        run: |
+          echo "RDJSON_DIR_PATH=${{ env.LINTS_PATH }}" >> $GITHUB_ENV
+          echo "RDJSON_FILE_PATH=${{ env.LINTS_PATH }}/lints.rdjsonl" >> $GITHUB_ENV
+          mkdir -p ${{ env.LINTS_PATH }}
+          echo "ZANUDA_REPORT_FILE_PATH=${{ env.LINTS_PATH }}/lints.txt" >> $GITHUB_ENV
+
+      - name: Running linter in ${{ github.workspace }}...
+        run: |
+          cd ${{ github.workspace }}
+          opam exec -- zanuda -dir . -add-prefix ${{ github.workspace }}/ -no-no_toplevel_eval -ordjsonl ${{ env.RDJSON_FILE_PATH }} > ${{ env.ZANUDA_REPORT_FILE_PATH }}
