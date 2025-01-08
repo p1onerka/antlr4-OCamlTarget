@@ -13,7 +13,7 @@ jobs:
   format-and-lint:
     runs-on: ubuntu-latest
     container:
-      image: p1onerka/antlr4-OCamlTarget
+      image: p1onerka/antlr4-ocamltarget
 
     steps:
       - name: Checkout code
