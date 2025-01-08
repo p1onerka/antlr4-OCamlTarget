@@ -1,21 +1,25 @@
 (lang dune 3.16)
 
-(name runtime)
+(name Antlr_runtime)
 
 (generate_opam_files true)
 
 (source
- (github p1onerka/antlr4-OCamlTarget))
+ (github username/reponame))
 
-(authors "Ksenia Kotelnikova")
+(authors "Author Name")
 
-(maintainers "Ksenia Kotelnikova")
+(maintainers "Maintainer Name")
+
+(license LICENSE)
+
+(documentation https://url/to/documentation)
 
 (package
- (name runtime)
- (synopsis "runtime module for ANTLR")
- (description "OCaml runtime module for ANTLR")
- (depends ocaml dune (ocamlformat :build))
+ (name Antlr_runtime)
+ (synopsis "A short synopsis")
+ (description "A longer description")
+ (depends ocaml dune (ppx_inline_test :with-test) ppx_expect)
  (tags
   (topics "to describe" your project)))
 

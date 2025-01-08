@@ -1,3 +1,7 @@
+(** Copyright 2024-2025, Kotelnikova Ksenia <xeniia.ka@gmail.com> *)
+
+(** SPDX-License-Identifier: BSD 3-clause license *)
+
 type atn_type =
   | Lexer
   | Parser
@@ -22,6 +26,8 @@ type atn =
   ; decision_to_state : atn_state list
   }
 
+exception ATNError of string
+
 let get_decision_state atn decision =
   if decision < 0 || decision >= List.length atn.decision_to_state
   then None
@@ -38,12 +44,12 @@ let deserialize_atn data =
     value
   in
   let version = read () in
-  if version <> 4 then failwith (Printf.sprintf "Invalid ATN version: %d" version);
+  if version <> 4 then raise (ATNError "Incorrect ATN version");
   let grammar_type =
     match read () with
     | 0 -> Lexer
     | 1 -> Parser
-    | _ -> failwith "Invalid grammar type"
+    | _ -> raise (ATNError "Invalid grammar type")
   in
   let max_token_type = read () in
   let atn =
@@ -143,4 +149,33 @@ let print_atn atn =
     (fun idx state ->
       Printf.printf "  Decision %d -> %s\n" idx (string_of_atn_state state))
     atn.decision_to_state
+;;
+
+let%expect_test "deserialize_atn_test" =
+  let data = [| 4; 1; 10; 3; 1; 1; 2; 2; 6; 0; 2; 10; 20; 1; 30 |] in
+  let deserialized_atn = deserialize_atn data in
+  print_atn deserialized_atn;
+  [%expect
+    {|
+    ATN:
+      Grammar type: Parser
+      Max token type: 10
+
+    States (3):
+      [0] RuleStartState(rule=1)
+      [1] RuleStopState(rule=2)
+      [2] DecisionState(decision=0)
+
+    Rules (2):
+      Rule 1 -> StartState 10
+      Rule 2 -> StartState 20
+
+    Stop States (0):
+
+    Modes (1):
+      Mode 0 -> StartState 30
+
+    Decisions (1):
+      Decision 0 -> DecisionState(decision=0)
+  |}]
 ;;

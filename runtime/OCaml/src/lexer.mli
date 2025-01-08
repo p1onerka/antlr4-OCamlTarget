@@ -2,11 +2,4 @@
 
 (** SPDX-License-Identifier: BSD 3-clause license *)
 
-let token_eof = -1
-
-type token =
-  { token_type : int
-  ; text : string
-  ; start : int
-  ; stop : int
-  }
+val tokenize : int array -> Token.token list

@@ -1,6 +1,0 @@
-description = ""
-requires = ""
-archive(byte) = "runtime.cma"
-archive(native) = "runtime.cmxa"
-plugin(byte) = "runtime.cma"
-plugin(native) = "runtime.cmxs"

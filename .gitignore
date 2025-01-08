@@ -137,3 +137,7 @@ runtime/Cpp/runtime/libantlr4-runtime.dylib
 
 # Go test and performance trace files
 **/*.pprof
+
+# OCaml generated build files=
+runtime/OCaml/_build
+runtime/OCaml/_coverage

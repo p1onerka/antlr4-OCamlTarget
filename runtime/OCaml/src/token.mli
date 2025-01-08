@@ -2,7 +2,7 @@
 
 (** SPDX-License-Identifier: BSD 3-clause license *)
 
-let token_eof = -1
+val token_eof : int
 
 type token =
   { token_type : int

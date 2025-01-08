@@ -2,11 +2,6 @@
 
 (** SPDX-License-Identifier: BSD 3-clause license *)
 
-let token_eof = -1
+exception ParseError of string
 
-type token =
-  { token_type : int
-  ; text : string
-  ; start : int
-  ; stop : int
-  }
+val num : Token.token -> unit

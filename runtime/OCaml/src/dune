@@ -1,6 +1,5 @@
 (library
- (name runtime)
- (public_name runtime)
+ (name Antlr_runtime)
  (modules
   Utils
   Token
@@ -8,4 +7,6 @@
   Atn_deserialize
   Input_stream
   Lexer
-  Lexer_atn_simulator))
+  Lexer_atn_simulator)
+ (preprocess
+  (pps ppx_expect)))

@@ -1,3 +1,9 @@
+(** Copyright 2024-2025, Kotelnikova Ksenia <xeniia.ka@gmail.com> *)
+
+(** SPDX-License-Identifier: BSD 3-clause license *)
+
+exception StreamError of string
+
 module IntStream = struct
   type t =
     { mutable index : int
@@ -11,7 +17,7 @@ module IntStream = struct
 
   let consume stream =
     if stream.index >= stream.size
-    then failwith "Attempt to consume EOF"
+    then raise (StreamError "Attempt to consume EOF")
     else stream.index <- stream.index + 1
   ;;
 
